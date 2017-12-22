@@ -1,4 +1,5 @@
 from pkgutil import extend_path
+stuff = 'Hi'
 __path__ = extend_path(__path__, __name__)
 
 # The above addresses the issues that came up in
