@@ -7,8 +7,11 @@
 # Also suppressing unused function warnings for static functions since Cython
 # generates a static function that it puts in a header which causes this warning
 # to appear whenever anyone includes the header and doesn't use all the functions.
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing -Wno-unused-function $(python3-config --cflags")
-MESSAGE(STATUS "${CMAKE_CXX_FLAGS}")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing -Wno-unused-function -I/usr/include/python3.5m -I/usr/include/python3.5m  -Wno-unused-result -Wsign-compare -g -fstack-protector-strong -Wformat -Werror=format-security  -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes -I/usr/local/include/boost/python -lboost_python3 -lpython3.5m -shared -fPIC")
+SET(PYTHON_INCLUDE_DIRS "/usr/include/python3.5m")
+SET(PYTHON_LIBRARIES "/usr/lib/x86_64-linux-gnu/libpython3.5m.so")
+MESSAGE(STATUS "******${CMAKE_CXX_FLAGS}, ${PYTHON_INCLUDE_DIRS} **************************")
+MESSAGE(STATUS "**** ${PYTHON_LIBRARIES}")
 ADD_SUBDIRECTORY (opencog)
 
 INCLUDE_DIRECTORIES(

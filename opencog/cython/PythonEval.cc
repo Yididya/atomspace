@@ -230,8 +230,8 @@ static bool try_to_load_modules(const char ** config_paths)
         for (int i = 0; i < pathSize; i++)
         {
             PyObject* pySysPathLine = PyList_GetItem(pySysPath, i);
-            const char* sysPathCString = PyString_AsString(pySysPathLine);
-            logger().debug("    %2d > %s", i, sysPathCString);
+            // const char* sysPathCString = PyString_AsString(pySysPathLine);
+            // logger().debug("    %2d > %s", i, sysPathCString);
             // NOTE: PyList_GetItem returns borrowed reference so don't do this:
             // Py_DECREF(pySysPathLine);
         }
@@ -270,7 +270,7 @@ void opencog::global_python_initialize()
     // is as old as the wind. The solution of using dlopen() is given
     // here:
     // https://mail.python.org/pipermail/new-bugs-announce/2008-November/003322.html
-    dlopen("libpython2.7.so", RTLD_LAZY | RTLD_GLOBAL);
+    dlopen("libpython3.5m.so", RTLD_LAZY | RTLD_GLOBAL);
 
     // We don't really know the gstate yet but we'll set it here to avoid
     // compiler warnings below.
@@ -307,8 +307,8 @@ void opencog::global_python_initialize()
         // Many python libraries (e.g. ROS) expect sys.argv to be set.
         // So, avoid the error print, and let them know who we are.
         // We must do this *before* the module pre-loading, done below.
-        static const char *argv0 = "cogserver";
-        PySys_SetArgv(1, (char **) &argv0);
+        // static const char *argv0 = "cogserver";
+        // PySys_SetArgv(1, (char **) &argv0);
     }
 
     logger().info("[global_python_initialize] Adding OpenCog sys.path "
@@ -593,12 +593,12 @@ void PythonEval::build_python_error_message(const char* function_name,
         errorStringStream << "in " << function_name;
     if (pyError) {
         pyErrorString = PyObject_Str(pyError);
-        char* pythonErrorString = PyString_AsString(pyErrorString);
-        if (pythonErrorString) {
-            errorStringStream << ": " << pythonErrorString << ".";
-        } else {
-            errorStringStream << ": Undefined Error";
-        }
+        // char* pythonErrorString = PyString_AsString(pyErrorString);
+        // if (pythonErrorString) {
+            // errorStringStream << ": " << pythonErrorString << ".";
+        // } else {
+            // errorStringStream << ": Undefined Error";
+        // }
 
         // Cleanup the references. NOTE: The traceback can be NULL even
         // when the others aren't.
@@ -642,7 +642,7 @@ void PythonEval::execute_string(const char* command)
 
     if (pyResult)
         Py_DECREF(pyResult);
-    Py_FlushLine();
+    // Py_FlushLine();
 }
 
 int PythonEval::argument_count(PyObject* pyFunction)
@@ -656,7 +656,7 @@ int PythonEval::argument_count(PyObject* pyFunction)
     if (pyFunctionCode) {
         pyArgumentCount = PyObject_GetAttrString(pyFunctionCode, "co_argcount");
         if (pyArgumentCount) {
-            argumentCount = PyInt_AsLong(pyArgumentCount);
+            // argumentCount = PyInt_AsLong(pyArgumentCount);
         }  else {
             Py_DECREF(pyFunctionCode);
             return MISSING_FUNC_CODE;
@@ -1466,4 +1466,17 @@ void PythonEval::interrupt(void)
     _result += "PythonEval: interrupt not implemented!\n";
 
     logger().warn("[PythonEval] interrupt not implemented!\n");
+}
+
+static struct PyModuleDef atomspace =
+{
+    PyModuleDef_HEAD_INIT,
+    "atomspace", /* name of module */
+    "Here goes the doc",          /* module documentation, may be NULL */
+    -1,          /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+};
+
+PyMODINIT_FUNC PyInit_atomspace(void)
+{
+    return PyModule_Create(&atomspace);
 }
