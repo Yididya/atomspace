@@ -34,13 +34,7 @@ DivideLink::DivideLink(const HandleSeq& oset, Type t)
 }
 
 DivideLink::DivideLink(const Handle& a, const Handle& b)
-    : ArithmeticLink(DIVIDE_LINK, a, b)
-{
-	init();
-}
-
-DivideLink::DivideLink(Type t, const Handle& a, const Handle& b)
-    : ArithmeticLink(t, a, b)
+    : ArithmeticLink({a, b}, DIVIDE_LINK)
 {
 	init();
 }
@@ -62,7 +56,7 @@ void DivideLink::init(void)
 
 	// Disallow unary Divide. This makes things easier, overall.
 	if (1 == _outgoing.size())
-		_outgoing.insert(_outgoing.cbegin(), knil);
+		_outgoing.insert(_outgoing.begin(), knil);
 }
 
 static inline double get_double(const Handle& h)

@@ -13,11 +13,13 @@ ADD_LIBRARY (atomcore
 	ImplicationScopeLink.cc
 	LambdaLink.cc
 	NumberNode.cc
+	PrenexLink.cc
 	PresentLink.cc
 	PutLink.cc
 	Quotation.cc
 	RandomChoice.cc
 	RandomNumber.cc
+	RewriteLink.cc
 	ScopeLink.cc
 	SleepLink.cc
 	StateLink.cc
@@ -34,6 +36,7 @@ ADD_LIBRARY (atomcore
 ADD_DEPENDENCIES(atomcore opencog_atom_types)
 
 TARGET_LINK_LIBRARIES(atomcore
+	atomutils
 	atombase
 	${COGUTIL_LIBRARY}
 )
@@ -44,6 +47,7 @@ INSTALL (TARGETS atomcore
 
 INSTALL (FILES
 	ArityLink.h
+	ComposeLink.h
 	Context.h
 	DefineLink.h
 	DeleteLink.h
@@ -51,11 +55,13 @@ INSTALL (FILES
 	FunctionLink.h
 	LambdaLink.h
 	NumberNode.h
+	PrenexLink.h
 	PresentLink.h
 	PutLink.h
 	Quotation.h
 	RandomChoice.h
 	RandomNumber.h
+	RewriteLink.h
 	ScopeLink.h
 	SleepLink.h
 	StateLink.h
@@ -66,6 +72,5 @@ INSTALL (FILES
 	UnorderedLink.h
 	Variables.h
 	VariableList.h
-    ComposeLink.h
 	DESTINATION "include/opencog/atoms/core"
 )

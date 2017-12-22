@@ -234,7 +234,7 @@ static bool type_match_rec(const Handle& left_, const Handle& right_, bool tople
 			return true;
 		}
 
-		// Does one of the left choices atch a right? Is so then good.
+		// Does one of the left choices match a right? Is so then good.
 		for (const Handle& lh : left->getOutgoingSet())
 		{
 			if (type_match_rec(lh, right, false)) return true;
@@ -327,7 +327,7 @@ Handle filter_vardecl(const Handle& vardecl, const HandleSeq& hs)
 	}
 
 	// If we're here we have failed to recognize vardecl as a useful
-	// and well formed variable declaration, so Handle::UNDEFINED is
+	// and well-formed variable declaration, so Handle::UNDEFINED is
 	// returned.
 	return Handle::UNDEFINED;
 }

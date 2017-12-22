@@ -22,7 +22,7 @@
 
 #include <opencog/atoms/base/atom_types.h>
 #include <opencog/atoms/base/ClassServer.h>
-#include <opencog/atoms/core/ScopeLink.h>
+#include <opencog/atoms/core/RewriteLink.h>
 #include <opencog/atoms/core/NumberNode.h>
 #include "ComposeLink.h"
 
@@ -80,19 +80,24 @@ ComposeLink::ComposeLink(const Link& l) : FunctionLink(l)
 	check();
 }
 
-Handle ComposeLink::execute(AtomSpace* as) const
+Handle ComposeLink::execute() const
 {
 	Handle g = getOutgoingAtom(0);
 	Handle f = getOutgoingAtom(1);
-	ScopeLinkPtr g_sc = ScopeLinkCast(g);
-	OC_ASSERT(g_sc != nullptr, "First outgoing must be a scope");
+	RewriteLinkPtr g_sc = RewriteLinkCast(g);
+	OC_ASSERT(g_sc != nullptr, "First atom must be a RewriteLink");
 
 	const Variables& g_vars = g_sc->get_variables();
 	if (g_vars.size() == 1) {
 		// g has one variable only, thus we expect f to be a scope as
 		// opposed to a list of scopes
-		ScopeLinkPtr f_sc = ScopeLinkCast(f);
-		OC_ASSERT(f_sc != nullptr, "Second outgoing must be a scope");
+		RewriteLinkPtr f_sc = RewriteLinkCast(f);
+		OC_ASSERT(f_sc != nullptr, "Second atom must be a RewriteLink");
+
+		// Make sure it has a body, this may happen if the link has
+		// unquoted outgoing set.
+		OC_ASSERT(f_sc->get_body() != nullptr,
+		          "f doesn't have a body! f = %s", oc_to_string(f).c_str());
 
 		return compose(f_sc->get_vardecl(), {f_sc->get_body()});
 	}
@@ -112,12 +117,12 @@ Handle ComposeLink::execute(AtomSpace* as) const
 		if (fi->get_type() == PROJECT_LINK) {
 			values.push_back(n_vars.varseq[projection_index(fi)]);
 		} else {
-			ScopeLinkPtr fi_sc = ScopeLinkCast(fi);
+			RewriteLinkPtr fi_sc = RewriteLinkCast(fi);
 			OC_ASSERT(fi_sc != nullptr);
 			// Make sure its variables have the same named as the new
 			// variable declaration
-			Handle afi = fi_sc->alpha_conversion(n_vars.varseq);
-			ScopeLinkPtr afi_sc = ScopeLinkCast(afi);
+			Handle afi = fi_sc->alpha_convert(n_vars.varseq);
+			RewriteLinkPtr afi_sc = RewriteLinkCast(afi);
 			values.push_back(afi_sc->get_body());
 		}
 	}
@@ -128,17 +133,17 @@ Handle ComposeLink::compose(const Handle& nvardecl,
                             const HandleSeq& values) const
 {
 	Handle g = getOutgoingAtom(0);
-	ScopeLinkPtr g_sc = ScopeLinkCast(g);
-	OC_ASSERT(g_sc != nullptr, "First outgoing must be a scope");
+	RewriteLinkPtr g_sc = RewriteLinkCast(g);
+	OC_ASSERT(g_sc != nullptr, "First atom must be a RewriteLink");
 
-	HandleSeq comp_hs = g_sc->partial_substitute_bodies(nvardecl, values);
+	HandleSeq cmp_hs = g_sc->beta_reduce_bodies(nvardecl, values);
 
 	// Insert fvardecl if the outgoings if defined
 	if (nvardecl)
-		comp_hs.insert(comp_hs.begin(), nvardecl);
+		cmp_hs.insert(cmp_hs.begin(), nvardecl);
 
 	// Create composed scope
-	return createLink(comp_hs, g->get_type());
+	return createLink(cmp_hs, g->get_type());
 }
 
 Handle ComposeLink::compose(const Variables& nvars,

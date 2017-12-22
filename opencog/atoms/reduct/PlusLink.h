@@ -23,7 +23,6 @@
 #ifndef _OPENCOG_PLUS_LINK_H
 #define _OPENCOG_PLUS_LINK_H
 
-#include <opencog/atomspace/AtomSpace.h>
 #include <opencog/atoms/reduct/ArithmeticLink.h>
 
 namespace opencog
@@ -41,7 +40,6 @@ protected:
 	virtual Handle kons(const Handle&, const Handle&) const;
 
 	void init(void);
-	PlusLink(Type, const Handle& a, const Handle& b);
 
 public:
 	PlusLink(const Handle& a, const Handle& b);

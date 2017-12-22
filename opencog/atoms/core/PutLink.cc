@@ -30,19 +30,13 @@
 using namespace opencog;
 
 PutLink::PutLink(const HandleSeq& oset, Type t)
-    : ScopeLink(oset, t)
-{
-	init();
-}
-
-PutLink::PutLink(const Handle& a)
-    : ScopeLink(PUT_LINK, a)
+    : PrenexLink(oset, t)
 {
 	init();
 }
 
 PutLink::PutLink(const Link& l)
-    : ScopeLink(l)
+    : PrenexLink(l)
 {
 	init();
 }
@@ -129,17 +123,56 @@ void PutLink::static_typecheck_values(void)
 		return;
 
 	size_t sz = _varlist.varseq.size();
-	Type vtype = _values->get_type();
+
+	Handle valley = _values;
+	Type vtype = valley->get_type();
+
+	// If its a LambdaLink, try to see if its eta-reducible. If
+	// so, then eta-reduce it immediately. A LambdaLink is
+	// eta-reducible when it's body is a ListLink.
+	if (LAMBDA_LINK == vtype)
+	{
+		LambdaLinkPtr lam(LambdaLinkCast(_values));
+		Handle body = lam->get_body();
+
+		// The body might not exist, if there's an unmantched
+		// UnquoteLink in it.  I really dislike Quote/Unquote.
+		// There's something deeply evil about them.
+		if (nullptr == body)
+		{
+			throw SyntaxException(TRACE_INFO,
+				"PutLink given a malformed value=%s",
+				lam->to_string().c_str());
+		}
+
+		Type bt = body->get_type();
+		if (LIST_LINK == bt)
+		{
+			valley = body;
+			vtype = bt;
+		}
+	}
 
 	if (1 == sz)
 	{
-		if (not _varlist.is_type(_values)
+		if (not _varlist.is_type(valley)
 		    and SET_LINK != vtype
 		    and PUT_LINK != vtype
 		    and not (classserver().isA(vtype, SATISFYING_LINK)))
 		{
-				throw InvalidParamException(TRACE_INFO,
-					"PutLink mismatched type!");
+			// Well, one more possible case ...
+			// Function composition with lambda means that
+			// the body of the lambda must be the right type.
+			if (LAMBDA_LINK == vtype)
+			{
+				LambdaLinkPtr lam(LambdaLinkCast(valley));
+				const Handle& body = lam->get_body();
+				if (_varlist.is_type(body))
+					return; // everything is OK.
+			}
+
+			throw InvalidParamException(TRACE_INFO,
+				"PutLink mismatched type!");
 		}
 		return;
 	}
@@ -152,7 +185,9 @@ void PutLink::static_typecheck_values(void)
 	// The standard, default case is to get a ListLink as an argument.
 	if (LIST_LINK == vtype)
 	{
-		if (not _varlist.is_type(_values->getOutgoingSet()))
+		// is_type() verifies that the arity of the vars
+		// and the values matches up.
+		if (not _varlist.is_type(valley->getOutgoingSet()))
 		{
 			if (_vardecl)
 				throw SyntaxException(TRACE_INFO,
@@ -183,7 +218,7 @@ void PutLink::static_typecheck_values(void)
 
 	if (1 < sz)
 	{
-		for (const Handle& h : _values->getOutgoingSet())
+		for (const Handle& h : valley->getOutgoingSet())
 		{
 			// If the arity is greater than one, then the values must be in a list.
 		   if (h->get_type() != LIST_LINK)
@@ -198,7 +233,7 @@ void PutLink::static_typecheck_values(void)
 	}
 
 	// If the arity is one, the values must obey type constraint.
-	for (const Handle& h : _values->getOutgoingSet())
+	for (const Handle& h : valley->getOutgoingSet())
 	{
 		if (not _varlist.is_type(h))
 			throw InvalidParamException(TRACE_INFO,
@@ -207,6 +242,12 @@ void PutLink::static_typecheck_values(void)
 }
 
 /* ================================================================= */
+
+static inline Handle reddy(PrenexLinkPtr subs, const HandleSeq& oset)
+{
+	subs->make_silent(true);
+	return subs->beta_reduce(oset);
+}
 
 /**
  * Perform the actual beta reduction --
@@ -250,6 +291,8 @@ Handle PutLink::do_reduce(void) const
 {
 	Handle bods(_body);
 	Variables vars(_varlist);
+	PrenexLinkPtr subs(PrenexLinkCast(get_handle()));
+
 	// Resolve the body, if needed. That is, if the body is
 	// given in a defintion, get that defintion.
 	Type btype = _body->get_type();
@@ -272,34 +315,57 @@ Handle PutLink::do_reduce(void) const
 		bods = lam->get_body();
 		vars = lam->get_variables();
 		btype = bods->get_type();
+		subs = lam;
 	}
 
 	// Now get the values that we will plug into the body.
 	Type vtype = _values->get_type();
-
 	size_t nvars = vars.varseq.size();
 
-	// At this time, we don't know the number of arguments a FunctionLink
-	// might take.  Atomese does have the mechanisms to declare these,
-	// including arbitrary-arity functions, its just that its currently
-	// not declared anywhere.  So we just punt.  Example usage:
+	// FunctionLinks behave like pointless lambdas; that is, one can
+	// create valid beta-redexes with them. We handle that here.
+	//
+	// XXX At this time, we don't know the number of arguments any
+	// given FunctionLink might take.  Atomese does have the mechanisms
+	// to declare these, including arbitrary-arity functions, its
+	// just that its currently not declared anywhere for any of the
+	// FunctionLinks.  So we just punt.  Example usage:
 	// (cog-execute! (Put (Plus) (List (Number 2) (Number 2))))
+	// (cog-execute! (Put (Plus (Number 9)) (List (Number 2) (Number 2))))
 	if (0 == nvars and classserver().isA(btype, FUNCTION_LINK))
 	{
 		if (LIST_LINK == vtype)
-			return createLink(_values->getOutgoingSet(), btype);
+		{
+			HandleSeq oset(bods->getOutgoingSet());
+			const HandleSeq& rest = _values->getOutgoingSet();
+			oset.insert(oset.end(), rest.begin(), rest.end());
+			return createLink(oset, btype);
+		}
 
 		if (SET_LINK != vtype)
-			return createLink(btype, _values);
+		{
+			HandleSeq oset(bods->getOutgoingSet());
+			oset.emplace_back(_values);
+			return createLink(oset, btype);
+		}
 
 		// If the values are given in a set, then iterate over the set...
 		HandleSeq bset;
 		for (const Handle& h : _values->getOutgoingSet())
 		{
 			if (LIST_LINK == h->get_type())
-				bset.emplace_back(createLink(h->getOutgoingSet(), btype));
+			{
+				HandleSeq oset(bods->getOutgoingSet());
+				const HandleSeq& rest = h->getOutgoingSet();
+				oset.insert(oset.end(), rest.begin(), rest.end());
+				bset.emplace_back(createLink(oset, btype));
+			}
 			else
-				bset.emplace_back(createLink(btype, h));
+			{
+				HandleSeq oset(bods->getOutgoingSet());
+				oset.emplace_back(h);
+				bset.emplace_back(createLink(oset, btype));
+			}
 		}
 		return createLink(bset, SET_LINK);
 	}
@@ -313,7 +379,8 @@ Handle PutLink::do_reduce(void) const
 			oset.emplace_back(_values);
 			try
 			{
-				return vars.substitute(bods, oset, /* silent */ true);
+				// return vars.substitute(bods, oset, /* silent */ true);
+				return reddy(subs, oset);
 			}
 			catch (const TypeCheckException& ex)
 			{
@@ -329,7 +396,8 @@ Handle PutLink::do_reduce(void) const
 			oset.emplace_back(h);
 			try
 			{
-				bset.emplace_back(vars.substitute(bods, oset, /* silent */ true));
+				// bset.emplace_back(vars.substitute(bods, oset, /* silent */ true));
+				bset.emplace_back(reddy(subs, oset));
 			}
 			catch (const TypeCheckException& ex) {}
 		}
@@ -344,7 +412,25 @@ Handle PutLink::do_reduce(void) const
 		const HandleSeq& oset = _values->getOutgoingSet();
 		try
 		{
-			return vars.substitute(bods, oset, /* silent */ true);
+			// return vars.substitute(bods, oset, /* silent */ true);
+			return reddy(subs, oset);
+		}
+		catch (const TypeCheckException& ex)
+		{
+			return Handle::UNDEFINED;
+		}
+	}
+
+	// If the value is a LambdaLink, it will eta-reducible.
+	// We already checked this earlier (a static check), so we
+	// don't need any more checking. Just pass it through.
+	if (LAMBDA_LINK == vtype)
+	{
+		HandleSeq oset;
+		oset.emplace_back(_values);
+		try
+		{
+			return reddy(subs, oset);
 		}
 		catch (const TypeCheckException& ex)
 		{
@@ -363,7 +449,8 @@ Handle PutLink::do_reduce(void) const
 		const HandleSeq& oset = h->getOutgoingSet();
 		try
 		{
-			bset.emplace_back(vars.substitute(bods, oset, /* silent */ true));
+			// bset.emplace_back(vars.substitute(bods, oset, /* silent */ true));
+			bset.emplace_back(reddy(subs, oset));
 		}
 		catch (const TypeCheckException& ex) {}
 	}

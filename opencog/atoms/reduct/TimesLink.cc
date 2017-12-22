@@ -33,14 +33,8 @@ TimesLink::TimesLink(const HandleSeq& oset, Type t)
 	init();
 }
 
-TimesLink::TimesLink(Type t, const Handle& a, const Handle& b)
-    : ArithmeticLink(t, a, b)
-{
-	init();
-}
-
 TimesLink::TimesLink(const Handle& a, const Handle& b)
-    : ArithmeticLink(TIMES_LINK, a, b)
+    : ArithmeticLink({a,b}, TIMES_LINK)
 {
 	init();
 }
@@ -116,7 +110,7 @@ Handle TimesLink::kons(const Handle& fi, const Handle& fj) const
 		}
 		Handle foo(createLink(seq, TIMES_LINK));
 		TimesLinkPtr ap = TimesLinkCast(foo);
-		return ap->reduce();
+		return ap->delta_reduce();
 	}
 
 	// If we are here, we've been asked to multiply two things of the

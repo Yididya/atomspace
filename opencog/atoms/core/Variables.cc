@@ -115,10 +115,11 @@ void FreeVariables::find_variables(const Handle& h)
 	find_variables(HandleSeq{h});
 }
 
-HandleSeq FreeVariables::make_values(const HandleMap& varmap) const
+HandleSeq FreeVariables::make_sequence(const HandleMap& varmap) const
 {
 	HandleSeq values;
-	for (const Handle& var : varseq) {
+	for (const Handle& var : varseq)
+	{
 		HandleMap::const_iterator it = varmap.find(var);
 		values.push_back(it == varmap.end() ? var : it->second);
 	}
@@ -161,7 +162,7 @@ Handle FreeVariables::substitute_nocheck(const Handle& term,
                                          const HandleMap& vm,
                                          bool silent) const
 {
-	return substitute_scoped(term, make_values(vm), silent, index, 0);
+	return substitute_scoped(term, make_sequence(vm), silent, index, 0);
 }
 
 /// Perform beta-reduction on the term.  This is more-or-less a purely
@@ -626,6 +627,13 @@ Handle Variables::substitute(const Handle& func,
 	return substitute_nocheck(func, args);
 }
 
+Handle Variables::substitute(const Handle& func,
+                             const HandleMap& map,
+                             bool silent) const
+{
+	return substitute(func, make_sequence(map), silent);
+}
+
 /* ================================================================= */
 /**
  * Extend a set of variables.
@@ -711,41 +719,47 @@ bool FreeVariables::empty() const
 	return varseq.empty();
 }
 
+/// Look up the type declaration for `var`, but create the actual
+/// declaration for `alt`.  This is an alpha-renaming.
+Handle Variables::get_type_decl(const Handle& var, const Handle& alt) const
+{
+	// Simple type info
+	const auto& sit = _simple_typemap.find(var);
+	if (sit != _simple_typemap.end())
+	{
+		HandleSeq types;
+		for (Type t : sit->second)
+			types.push_back(Handle(createTypeNode(t)));
+		Handle types_h = types.size() == 1 ? types[0]
+			: createLink(types, TYPE_CHOICE);
+		return Handle(createLink(TYPED_VARIABLE_LINK, alt, types_h));
+	}
+
+	auto dit = _deep_typemap.find(var);
+	if (dit != _deep_typemap.end())
+	{
+		OC_ASSERT(false, "TODO: support deep type info");
+	}
+
+	auto fit = _fuzzy_typemap.find(var);
+	if (fit != _fuzzy_typemap.end())
+	{
+		OC_ASSERT(false, "TODO: support fuzzy type info");
+	}
+
+	// TODO: _glob_intervalmap?
+
+	// No type info
+	return alt;
+}
+
 Handle Variables::get_vardecl() const
 {
 	HandleSeq vars;
-	for (const Handle& var : varseq) {
-
-		// Simple type info
-		auto sit = _simple_typemap.find(var);
-		if (sit != _simple_typemap.end()) {
-			HandleSeq types;
-			for (Type t : sit->second)
-				types.push_back(Handle(createTypeNode(t)));
-			Handle types_h = types.size() == 1 ? types[0]
-				: createLink(types, TYPE_CHOICE);
-			vars.push_back(createLink(TYPED_VARIABLE_LINK, var, types_h));
-			continue;
-		}
-
-		auto dit = _deep_typemap.find(var);
-		if (dit != _deep_typemap.end()) {
-			OC_ASSERT(false, "TODO: support deep type info");
-			continue;
-		}
-
-		auto fit = _fuzzy_typemap.find(var);
-		if (fit != _fuzzy_typemap.end()) {
-			OC_ASSERT(false, "TODO: support fuzzy type info");
-			continue;
-		}
-
-		// TODO: _glob_intervalmap?
-
-		// No type info
-		vars.push_back(var);
+	for (const Handle& var : varseq)
+	{
+		vars.emplace_back(get_type_decl(var, var));
 	}
-
 	if (vars.size() == 1)
 		return vars[0];
 

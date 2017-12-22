@@ -242,25 +242,38 @@ DEFINE_LINK <- UNIQUE_LINK
 // necessarily list ALL the (free) variables within it; the ScopeLink
 // need not bind all of them.  The FreeLink also has no type
 // restrictions on the variables.
-//
-// The ScopeLink differs from a LambdaLink in that it does NOT allow
-// beta-reduction; only LambdaLinks can be beta-reduced. Thus,
-// ScopeLink can be used as a base class for things like ForAllLink,
-// ExistsLink and AverageLink, which bind variables, but are not
-// beta-reducible.
 SCOPE_LINK <- ORDERED_LINK
 
-// A LambdaLink is a link whose bound variables may be substituted,
-// that is, may be beta-reduced. It can be thought of as not only a
-// variable declaration (which is what ScopeLink does) but also has
-// the ability to substitute values for those variables.  This is
-// exactly the standard definition from lambda calc/functional
-// programming: an anonymous function declaration.
-LAMBDA_LINK <- SCOPE_LINK
+// The RewriteLink is a ScopeLink with extra methods that perform
+// alpha conversion and beta reduction on the ScopeLink. It is a base
+// class for many kinds of atom types, most on which CANNOT be treated
+// as if they were lambdas!  So user beware: although RewriteLink feels
+// like LambdaLink ... it isn't.  Not everything is a Lambda.
+REWRITE_LINK <- SCOPE_LINK
+
+// The PrenexLink is a RewriteLink that maintains prenex normal form.
+// It serves as a base class for the various pattern-matching links,
+// since pattern matching only makes sense when the patterns are written
+// in prenex normal form.  It also serves as the base class for Lambda,
+// since function composition in atomese only seems to make sense if
+// the result is in prenex form. (I can't figure out the meaning,
+// semantics of the non-prenex forms).
+PRENEX_LINK <- REWRITE_LINK
+
+// The LambdaLink is supposed to roughly model the traditional concept
+// of a lambda from lambda calculus (or functional programming). It
+// is meant to behave just like a lambda-abstraction, and supports the
+// standard operations of beta-reduction and alpha-conversion (modulo
+// that the atomspace enforces alpha-equivalence).  Non-prenex lambdas
+// in atomese don't seem to "make any sense", at least to me, so
+// lambda's are forced to be prenex. This is a departure from classical
+// lambda calculus.
+LAMBDA_LINK <- PRENEX_LINK
 
 // PutLinks perform a beta-reduction when executed; i.e. they get
-// beta-reduced when they are executed.
-PUT_LINK <- SCOPE_LINK
+// beta-reduced when they are executed. PutLinks are the same thing as
+// beta-redexes.
+PUT_LINK <- PRENEX_LINK
 
 // Pattern definition, pattern grounding/satisfaction.
 // The PatternLink implements the base class holding a pattern that
@@ -268,7 +281,7 @@ PUT_LINK <- SCOPE_LINK
 // enable a C++ class that unpacks all the arguments and types, etc.
 // into assorted C++ structures. It does not have any semantics in and
 // of itself, it just holds machinery.
-PATTERN_LINK <- SCOPE_LINK         // A pattern encapsulated in a Link.
+PATTERN_LINK <- PRENEX_LINK         // A pattern encapsulated in a Link.
 
 // We subdivide patterns into two types: one type returns a TV when it
 // is evaluated.  The other type returns a set of atoms when it is
@@ -334,6 +347,7 @@ EXTENSIONAL_EQUIVALENCE_LINK <- EQUIVALENCE_LINK
 ASSOCIATIVE_LINK <- ORDERED_LINK
 
 // Mystery link.  Lexical attraction???
+// Can we nuke this ??
 ATTRACTION_LINK <- ORDERED_LINK
 
 // To be used with PredicateNode
@@ -357,15 +371,8 @@ GROUNDED_SCHEMA_NODE <- SCHEMA_NODE,GROUNDED_PROCEDURE_NODE
 
 // PredicateNodes are TV-valued.  They must return a TV.
 PREDICATE_NODE <- PROCEDURE_NODE
-// Cannot be both a node and a link! Have to be one or the other!
-DEFINED_PREDICATE_NODE <- PREDICATE_NODE// ,EVALUATABLE_LINK
+DEFINED_PREDICATE_NODE <- PREDICATE_NODE
 GROUNDED_PREDICATE_NODE <- PREDICATE_NODE,GROUNDED_PROCEDURE_NODE
-
-// Huh?? XXX What are these? I don't understand them Do we use them
-// anywhere? I think the first is same as ExecutionOutputLink, right?
-// Not clear how a schema can be evaluated ...
-// SCHEMA_EXECUTION_LINK <- INHERITANCE_LINK
-// SCHEMA_EVALUATION_LINK <- SCHEMA_EXECUTION_LINK
 
 // ==============================================================
 // Types and type constructors.
